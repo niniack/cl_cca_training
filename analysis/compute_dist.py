@@ -187,7 +187,7 @@ class DistanceCalculator(LinearMetric):
                 set_conv_dict(i, j, dist_conv, D_conv)
         else:
             for i, j, dist_min in results:
-                D_min[i, j], D_mean[j, i] = dist_min, dist_min
+                D_min[i, j], D_min[j, i] = dist_min, dist_min
 
         return D_min
 
