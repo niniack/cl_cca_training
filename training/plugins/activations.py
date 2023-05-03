@@ -34,6 +34,11 @@ class ActivationSaver(SupervisedPlugin):
                 self.get_activation(layer)
             )
 
+    def before_eval_dataset_adaptation(self, strategy: "SupervisedTemplate", *args, **kwargs):
+        indices = list(range(self.size))
+        strategy.experience.dataset = strategy.experience.dataset.subset(
+            indices)
+
     def after_eval_forward(self, strategy: "SupervisedTemplate", *args, **kwargs):
         # Iterate through all layers in the latest activation
         for k, v in self.latest_activations.items():
@@ -49,5 +54,4 @@ class ActivationSaver(SupervisedPlugin):
 
     def after_eval_exp(self, strategy: "SupervisedTemplate", *args, **kwargs):
         # strategy.activations = self.activations
-        strategy.activations = {k: v[:self.size]
-                                for k, v in self.activations.items()}
+        strategy.activations = {k: v for k, v in self.activations.items()}

@@ -28,8 +28,9 @@ from analysis.args import (
     TRUNCATE
 )
 
-HEATMAP_MEAN_DATA = {}
-HEATMAP_MIN_DATA = {}
+HEATMAP_LWF_NAIVE_DATA = {}
+HEATMAP_MAS_NAIVE_DATA = {}
+HEATMAP_LWF_MAS_DATA = {}
 RAW_CONV_DATA = {}
 os.environ['OMP_NUM_THREADS'] = '1'
 
@@ -97,7 +98,7 @@ class DistanceCalculator(LinearMetric):
 
         dist_mean = np.mean(dists)
         dist_min = np.min(dists)
-        return i, j, dist_mean, dist_min, dists
+        return i, j, dist_min, dist_mean, dists
 
     def _compute_distance_star(self, args):
         """Helper function for multiprocessing.
@@ -175,32 +176,34 @@ class DistanceCalculator(LinearMetric):
         queue.put(None)
         listener_proc.join()
 
-        D_mean = np.zeros((n_networks, n_networks))
         D_min = np.zeros((n_networks, n_networks))
+        D_mean = np.zeros((n_networks, n_networks))
         D_conv = {}
 
         if conv:
-            for i, j, dist_mean, dist_min, dist_conv in results:
-                D_mean[i, j], D_mean[j, i] = dist_mean, dist_mean
+            for i, j, dist_min, dist_mean, dist_conv in results:
                 D_min[i, j], D_min[j, i] = dist_min, dist_min
+                D_mean[i, j], D_mean[j, i] = dist_mean, dist_mean
                 set_conv_dict(i, j, dist_conv, D_conv)
         else:
-            for i, j, dist_mean in results:
-                D_mean[i, j], D_mean[j, i] = dist_mean, dist_mean
+            for i, j, dist_min in results:
+                D_min[i, j], D_mean[j, i] = dist_min, dist_min
 
-        return D_mean, D_min, D_conv
+        return D_min
 
 
 def initialize_dict():
-    global HEATMAP_MEAN_DATA
-    global HEATMAP_MIN_DATA
+    global HEATMAP_LWF_NAIVE_DATA
+    global HEATMAP_MAS_NAIVE_DATA
+    global HEATMAP_LWF_MAS_DATA
     global RAW_CONV_DATA
 
     for layer in LAYERS:
-        HEATMAP_MEAN_DATA[layer] = {}
+        HEATMAP_LWF_MAS_DATA[layer] = {}
 
-    RAW_CONV_DATA = copy.deepcopy(HEATMAP_MEAN_DATA)
-    HEATMAP_MIN_DATA = copy.deepcopy(HEATMAP_MEAN_DATA)
+    RAW_CONV_DATA = copy.deepcopy(HEATMAP_LWF_MAS_DATA)
+    HEATMAP_LWF_NAIVE_DATA = copy.deepcopy(HEATMAP_LWF_MAS_DATA)
+    HEATMAP_MAS_NAIVE_DATA = copy.deepcopy(HEATMAP_LWF_MAS_DATA)
 
 
 def main(args):
@@ -227,6 +230,7 @@ def main(args):
             # Build the input for pairwise calculator
             LWF_LAYER_ACTS = []
             MAS_LAYER_ACTS = []
+            NAIVE_LAYER_ACTS = []
 
             # Pairwise for all models
             for model in LOAD_EXPERIENCES:
@@ -238,22 +242,35 @@ def main(args):
                 mas_act = activations_dict['mas'][str(
                     model)][layer]
 
+                naive_act = activations_dict['naive'][str(
+                    model)][layer]
+
                 LWF_LAYER_ACTS.append(lwf_act[:TRUNCATE])
                 MAS_LAYER_ACTS.append(mas_act[:TRUNCATE])
+                NAIVE_LAYER_ACTS.append(naive_act[:TRUNCATE])
 
-            layer_mean_dist, layer_min_dist, layer_conv_dist = calculator.pairwise_distances(
+            lwf_mas_dist = calculator.pairwise_distances(
                 LWF_LAYER_ACTS, MAS_LAYER_ACTS, conv=False)
 
-            HEATMAP_MEAN_DATA[layer] = layer_mean_dist.tolist()
-            HEATMAP_MIN_DATA[layer] = layer_min_dist.tolist()
-            RAW_CONV_DATA[layer] = layer_conv_dist
+            lwf_naive_dist = calculator.pairwise_distances(
+                LWF_LAYER_ACTS, NAIVE_LAYER_ACTS, conv=False)
+
+            mas_naive_dist = calculator.pairwise_distances(
+                MAS_LAYER_ACTS, NAIVE_LAYER_ACTS, conv=False)
+
+            HEATMAP_LWF_MAS_DATA[layer] = lwf_mas_dist.tolist()
+            HEATMAP_LWF_NAIVE_DATA[layer] = lwf_naive_dist.tolist()
+            HEATMAP_MAS_NAIVE_DATA[layer] = mas_naive_dist.tolist()
 
         # Dump data
-        with open(f'{DIR}/alpha_{ALPHA}_heatmap_on_exp_{exp_id}.json', 'w') as f:
-            json.dump(HEATMAP_MEAN_DATA, f)
+        with open(f'{DIR}/lwf_mas_alpha_{ALPHA}_heatmap_on_exp_{exp_id}.json', 'w') as f:
+            json.dump(HEATMAP_LWF_MAS_DATA, f)
 
-        # with open(f'{DIR}/heatmap_min_on_exp_{exp_id}.json', 'w') as f:
-        #     json.dump(HEATMAP_MIN_DATA, f)
+        with open(f'{DIR}/lwf_naive_alpha_{ALPHA}_heatmap_on_exp_{exp_id}.json', 'w') as f:
+            json.dump(HEATMAP_LWF_NAIVE_DATA, f)
+
+        with open(f'{DIR}/mas_naive_alpha_{ALPHA}_heatmap_on_exp_{exp_id}.json', 'w') as f:
+            json.dump(HEATMAP_MAS_NAIVE_DATA, f)
 
         # with open(f'{DIR}/raw_conv_on_exp_{exp_id}.json', 'w') as f:
         #     json.dump(RAW_CONV_DATA, f)
@@ -265,7 +282,7 @@ if __name__ == "__main__":
     DIR = DataStreamEnum[args.split].value
     EVALUATE_EXPERIENCES = [args.experience]
 
-    # # DEBUG
+    # DEBUG
     # LAYERS = [
     #     "vgg.features.13"
     # ]

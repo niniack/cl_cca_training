@@ -1,5 +1,16 @@
 from training.utils import create_default_args
 
+naive_args = create_default_args({
+    'cuda': 1,
+    'train_epochs': 150,
+    'learning_rate': 1e-3,
+    'train_mb_size': 512,
+    'seed': None,
+    'dataset_root': None,
+    'save_folder': 'saved_models/naive_150_saved_models/'
+})
+
+
 lwf_args = create_default_args({
     'cuda': 1,
     'alpha': 1,

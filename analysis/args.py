@@ -1,7 +1,7 @@
 import argparse
 
 MODEL_DIR = "saved_models"
-ALGOS = ["lwf", "mas"]
+ALGOS = ["lwf", "mas", "naive"]
 LAYERS = [
     "vgg.features.3",
     "vgg.features.6",

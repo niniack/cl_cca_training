@@ -76,6 +76,7 @@ class StrategiesEnum(Enum):
     """
     lwf = avalanche.training.LwF
     mas = avalanche.training.MAS
+    naive = avalanche.training.Naive
 
     def __call__(self, *args, **kwargs):
         return self.value(*args, **kwargs)

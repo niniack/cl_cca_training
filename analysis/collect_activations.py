@@ -24,7 +24,7 @@ from utils import (
     DataStreamEnum
 )
 
-from training.args import lwf_args, mas_args
+from training.args import lwf_args, mas_args, naive_args
 from training.models.models import MultiHeadVGGSmall
 
 from avalanche.evaluation.metrics import (
@@ -44,7 +44,7 @@ EVALS = len(ALGOS)*len(LOAD_EXPERIENCES)
 def initialize_dict():
     global ACTIVATIONS_DATA
     global SHAPE_DATA
-    ACTIVATIONS_DATA = {"lwf": {}, "mas": {}}
+    ACTIVATIONS_DATA = {"lwf": {}, "mas": {}, "naive": {}}
 
     for algo in ALGOS:
         ACTIVATIONS_DATA[algo] = {}
@@ -77,6 +77,7 @@ def main():
     # Directory where all models are saved
     lwf_dir = Path(f"./{MODEL_DIR}/lwf_150_saved_models")
     mas_dir = Path(f"./{MODEL_DIR}/mas_150_saved_models")
+    naive_dir = Path(f"./{MODEL_DIR}/naive_150_saved_models")
 
     # Torch/Avalanche necessities
     criterion = CrossEntropyLoss()
@@ -101,10 +102,12 @@ def main():
         pattern = f"*{load_experience}"
         lwf_path = list(lwf_dir.glob(pattern))[0]
         mas_path = list(mas_dir.glob(pattern))[0]
+        naive_path = list(naive_dir.glob(pattern))[0]
 
         # Instantiate trained models
         lwf_model = model_loader(base_model=base_model, path=lwf_path)
         mas_model = model_loader(base_model=base_model, path=mas_path)
+        naive_model = model_loader(base_model=base_model, path=naive_path)
 
         # Instantiate strategies
         lwf_strategy = strategy_builder(
@@ -127,25 +130,39 @@ def main():
             size=TRUNCATE,
         )
 
+        naive_strategy = strategy_builder(
+            strat_enum=StrategiesEnum.naive,
+            model=naive_model,
+            criterion=criterion,
+            evaluation_plugin=evaluation_plugin,
+            strategy_args=naive_args,
+            layers=LAYERS,
+            size=TRUNCATE,
+        )
+
         # Run evaluation
         print(
             f"EVALUATING MODELS TRAINED ON EXPERIENCE {load_experience}")
 
         lwf_strategy.eval(experiences[EVALUATE_EXPERIENCE])
         mas_strategy.eval(experiences[EVALUATE_EXPERIENCE])
+        naive_strategy.eval(experiences[EVALUATE_EXPERIENCE])
 
         for layer in LAYERS:
 
             lwf_acts = lwf_strategy.activations[layer].cpu().numpy()
             mas_acts = mas_strategy.activations[layer].cpu().numpy()
+            naive_acts = naive_strategy.activations[layer].cpu().numpy()
 
             ACTIVATIONS_DATA['lwf'][str(load_experience)][layer] = lwf_acts
             ACTIVATIONS_DATA['mas'][str(load_experience)][layer] = mas_acts
+            ACTIVATIONS_DATA['naive'][str(load_experience)][layer] = naive_acts
 
             SHAPE_DATA['lwf'][str(load_experience)][layer] = lwf_acts.shape
             SHAPE_DATA['mas'][str(load_experience)][layer] = mas_acts.shape
+            SHAPE_DATA['naive'][str(load_experience)][layer] = naive_acts.shape
 
-        del lwf_strategy, mas_strategy, lwf_model, mas_model
+        del lwf_strategy, mas_strategy, naive_strategy, lwf_model, mas_model, naive_model
 
     # Pickle data
     with open(f'{SAVE_DIR}/act_on_exp_{EVALUATE_EXPERIENCE}.pickle', 'wb') as f:
