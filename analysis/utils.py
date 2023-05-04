@@ -7,7 +7,7 @@ import numpy as np
 from torch.optim import SGD
 import avalanche
 from tqdm import tqdm
-from training.plugins.activations import ActivationSaver
+from analysis.plugins.activations import ActivationSaver
 
 # Dummy value added to a queue for progress bar update
 SENTINEL = 1
@@ -94,7 +94,10 @@ def strategy_builder(strat_enum,
                      evaluation_plugin,
                      strategy_args,
                      layers,
-                     size=1000):
+                     size=1000,
+                     activation_plugin=False,
+                     cam_plugin=False
+                     ):
     """Builds a strategy from Avalanche
 
     Args:
@@ -109,8 +112,12 @@ def strategy_builder(strat_enum,
     Returns:
         _type_: Returns an Avalanche strategy
     """
-    activation_saver_plugin = ActivationSaver(
-        model=model, layers=layers, size=size)
+    plugins = []
+    if (activation_plugin):
+        plugins.append(ActivationSaver(model=model, layers=layers, size=size))
+
+    if (cam_plugin):
+        pass
 
     device = torch.device(
         f"cuda:{strategy_args.cuda}" if torch.cuda.is_available() else "cpu")
@@ -127,7 +134,7 @@ def strategy_builder(strat_enum,
                       eval_mb_size=1000,
                       device=device,
                       evaluator=evaluation_plugin,
-                      plugins=[activation_saver_plugin],
+                      plugins=plugins,
                       **filtered_args)
 
 
